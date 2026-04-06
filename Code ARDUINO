@@ -1,0 +1,144 @@
+// Acest cod se ocupă cu controlul servo-motoarelor, gestionarea modului autonom și manual, precum 
+și comunicarea prin HC-05 cu ESP32. 
+#include <Wire.h> 
+#include <Adafruit_PWMServoDriver.h> 
+#include <Servo.h> 
+#include <SoftwareSerial.h> 
+#include <MPU6050.h> 
+// Adresa PCA9685 
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(); 
+// Definirea pinilor pentru servo-motoare 
+#define HEAD 0 
+#define TORSO 1 
+#define ARM_RIGHT 2 
+#define ARM_LEFT 3 
+#define ELBOW_LEFT 4 
+#define ELBOW_RIGHT 5 
+#define HIP_RIGHT 6 
+#define HIP_LEFT 7 
+#define KNEE_LEFT 8 
+#define KNEE_RIGHT 9 
+// Senzor distanță 
+#define TRIG_PIN 8 
+#define ECHO_PIN 9 
+// Bluetooth pentru modul manual 
+SoftwareSerial Bluetooth(10, 11); // TX = pin 11, RX = pin 10 
+// Obiect MPU6050 
+MPU6050 mpu; 
+// Variabile globale 
+int mode = 0; // 0 = autonom, 1 = manual 
+int distance; 
+int ax, ay, az; // Valorile ax, ay, az pentru accelerometru 
+int gx, gy, gz; // Valorile gx, gy, gz pentru giroscop 
+void setup() { 
+Serial.begin(9600); // Inițializare Serial 
+Bluetooth.begin(9600); // Inițializare Bluetooth 
+pwm.begin(); 
+pwm.setPWMFreq(50); // Frecvență pentru servo-motoare 
+pinMode(TRIG_PIN, OUTPUT); 
+pinMode(ECHO_PIN, INPUT); 
+if (!mpu.begin()) { 
+Serial.println("MPU6050 nu a fost detectat!"); 
+while (1); 
+} 
+// Inițializare servo-motoare 
+for (int i = 0; i < 10; i++) { 
+setServo(i, 90); // Setare poziție inițială 
+} 
+} 
+int readDistance() { 
+digitalWrite(TRIG_PIN, LOW); 
+delayMicroseconds(2); 
+digitalWrite(TRIG_PIN, HIGH); 
+delayMicroseconds(10); 
+digitalWrite(TRIG_PIN, LOW); 
+long duration = pulseIn(ECHO_PIN, HIGH); 
+if (duration == 0) return 500; // Fallback pentru distanță maximă 
+return duration * 0.034 / 2; 
+} 
+void setServo(int servo, int angle) { 
+int pulse = map(angle, 0, 180, 102, 512); 
+pwm.setPWM(servo, 0, pulse); 
+} 
+void autonomMode() { 
+distance = readDistance(); 
+mpu.getAcceleration(&ax, &ay, &az); 
+mpu.getRotation(&gx, &gy, &gz); 
+if (distance < 20) { 
+setServo(HIP_RIGHT, 90); 
+setServo(HIP_LEFT, 90); 
+delay(500); 
+} else { 
+if (ax > 1000 || ay > 1000) { 
+setServo(HIP_RIGHT, 90); 
+setServo(HIP_LEFT, 90); 
+} else { 
+setServo(HIP_RIGHT, 60); 
+setServo(HIP_LEFT, 120); 
+} 
+} 
+setServo(HEAD, 90); 
+delay(500); 
+} 
+void manualMode() { 
+if (Bluetooth.available()) { 
+String command = Bluetooth.readStringUntil('\n');  // Citire comandă 
+command.trim();  // Elimină spațiile la începutul și sfârșitul comenzii 
+if (command == "mergi înainte") { 
+setServo(HIP_RIGHT, 60); 
+setServo(HIP_LEFT, 120); 
+} 
+else if (command == "mergi înapoi") { 
+setServo(HIP_RIGHT, 120); 
+setServo(HIP_LEFT, 60); 
+} 
+else if (command == "întoarce-te") { 
+setServo(HIP_RIGHT, 90); 
+setServo(HIP_LEFT, 90); 
+} 
+else if (command == "ridică mâna dreaptă") { 
+setServo(ARM_RIGHT, 180);  // Ridică mâna dreaptă 
+} 
+else if (command == "coboară mâna dreaptă") { 
+setServo(ARM_RIGHT, 0);  // Coboară mâna dreaptă 
+} 
+    else if (command == "ridică mâna stângă") { 
+      setServo(ARM_LEFT, 180);  // Ridică mâna stângă 
+    } 
+    else if (command == "coboară mâna stângă") { 
+      setServo(ARM_LEFT, 0);  // Coboară mâna stângă 
+    } 
+    else if (command == "analizează zona") { 
+      // Implementare analiză zonă (de exemplu, citire senzor distanță) 
+      distance = readDistance(); 
+      if (distance < 20) { 
+        Serial.println("Obstacol detectat la distanța de " + String(distance) + " cm"); 
+      } else { 
+        Serial.println("Zona este liberă"); 
+      } 
+    } 
+    else { 
+      Serial.println("Comandă necunoscută"); 
+    } 
+    delay(1000); 
+  } 
+} 
+ 
+void loop() { 
+  if (Bluetooth.available()) { 
+    String modeSelect = Bluetooth.readStringUntil('\n'); 
+    modeSelect.trim(); 
+     
+    if (modeSelect == "autonom") { 
+      mode = 0; 
+    } else if (modeSelect == "manual") { 
+      mode = 1; 
+    } 
+  } 
+ 
+  if (mode == 0) { 
+    autonomMode(); 
+  } else if (mode == 1) { 
+    manualMode(); 
+  } 
+} 

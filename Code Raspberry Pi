@@ -1,0 +1,31 @@
+// Acesta este codul pentru Raspberry Pi, care va interpreta comenzile vocale sau textuale și le va 
+trimite către ESP32 prin Bluetooth. 
+from flask import Flask 
+import bluetooth 
+import time 
+app = Flask(__name__) 
+# Configurare Bluetooth 
+bluetooth_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM) 
+bluetooth_socket.connect(("Adresa MAC a ESP32", 1)) 
+@app.route("/mergiInainte") 
+def move_forward(): 
+bluetooth_socket.send("mergi înainte\n") 
+return "Mergi înainte" 
+@app.route("/mergiInapoi") 
+def move_backward(): 
+bluetooth_socket.send("mergi înapoi\n") 
+return "Mergi înapoi" 
+@app.route("/ridicaManaDreapta") 
+def raise_right_hand(): 
+bluetooth_socket.send("ridică mâna dreaptă\n") 
+return "Mâna dreaptă ridicată" 
+@app.route("/coboaraManaDreapta") 
+def lower_right_hand(): 
+bluetooth_socket.send("coboară mâna dreaptă\n") 
+return "Mâna dreaptă coborâtă" 
+@app.route("/analizeazaZona") 
+def analyze_area(): 
+bluetooth_socket.send("analizează zona\n") 
+return "Analiza zonei" 
+if __name__ == "__main__": 
+app.run(host='0.0.0.0', port=5000)

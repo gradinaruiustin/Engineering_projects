@@ -1,4 +1,4 @@
-# Planetary Exploration Robot (Intelligent Humanoid)
+# Planetary Exploration Robot
 
 ## Project Goal
 The goal of this project is to build an intelligent humanoid robot capable of:  

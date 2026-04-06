@@ -1,15 +1,13 @@
 # Planetary Exploration Robot (Intelligent Humanoid)
 
-## 📌 Project Goal
+## Project Goal
 The goal of this project is to build an intelligent humanoid robot capable of:  
 - Moving autonomously or manually in an unknown environment  
 - Monitoring internal statistics in real-time (voltage, current)  
 - Communicating with MATLAB via WiFi (ESP32)  
 - Allowing 3D trajectory editing from a MATLAB interface  
 
----
-
-## 🛠 Hardware Development
+## Hardware Development
 
 ### Microcontrollers & Development Boards
 **ESP32 (WiFi + Bluetooth)**  
@@ -19,8 +17,6 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - Pins: 34 GPIO including analog inputs, SPI, I2C, UART  
 - Power: 5V via MicroUSB, logic 3.3V  
 - Security: AES, SHA-2, ECC, RSA, WPA/WPA2/WPA3  
-
----
 
 ### Motors & Motor Control
 **MG996R Servo Motor** (trunk, legs)  
@@ -33,8 +29,6 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - PWM control of up to 16 servos using only 2 I2C pins  
 - Frequency: 40–1000 Hz, Resolution: 12-bit  
 
----
-
 ### Sensors
 **HC-SR04 (Ultrasonic Distance Sensor)**  
 - Range: 2–500 cm, resolution: 0.3 cm, angle: <15°  
@@ -45,8 +39,6 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 **INA219 (Voltage & Current Sensor)**  
 - Measures up to ±26V, ±3.2A, I2C addresses: 0x40, 0x41, 0x44, 0x45  
 
----
-
 ### Other Components
 - LM2596 Voltage Regulator (5V for servos)  
 - Breadboard (400 points)  
@@ -54,15 +46,11 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - Power Bank USB (10,000 mAh)  
 - LiPo Battery 11.1V, 2200 mAh  
 
----
-
-## ⚡ Power Supply
+## Power Supply
 - Main power for microcontrollers and modules via Power Bank  
 - Servo motors powered separately via LiPo battery regulated by LM2596  
 
----
-
-## 🎮 Operating Modes
+## Operating Modes
 
 ### Autonomous Mode
 - Uses HC-SR04 sensor for obstacle detection  
@@ -73,9 +61,7 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - Executes pre-defined commands from MATLAB interface  
 - Real-time monitoring of sensor data  
 
----
-
-## 💻 Software & Libraries
+## Software & Libraries
 
 ### Programming Languages
 - MATLAB  
@@ -92,9 +78,7 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - UIFigure, uiaxes, uipanel (GUI)  
 - datetime, writetable, ginput, plot3, split  
 
----
-
-## ⚙️ Servo Motor Configuration
+## Servo Motor Configuration
 
 **SG90 (fine movements):**  
 - Head → PWM 0  
@@ -115,9 +99,7 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - Powered by LM2596 5V stable  
 - SDA → GPIO 21, SCL → GPIO 22  
 
----
-
-## 🛰 Sensor Connections
+## Sensor Connections
 
 **HC-SR04:**  
 - Trig → GPIO 5  
@@ -132,9 +114,7 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 - SDA → GPIO 21, SCL → GPIO 22  
 - VCC → 3.3V, GND → common ground  
 
----
-
-## 🔗 System Schematics
+## System Schematics
 
 ### Logic Overview
 - ESP32 sends PWM signals to PCA9685  

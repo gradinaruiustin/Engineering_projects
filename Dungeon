@@ -1,0 +1,247 @@
+import pygame
+import random
+
+# --- Configurations ---
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+TILE_SIZE = 48
+FPS = 60
+
+pygame.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("RPG Dungeon 2D")
+clock = pygame.time.Clock()
+
+# --- Load images ---
+player_img = pygame.image.load("player/player.png").convert_alpha()
+player_img = pygame.transform.scale(player_img, (TILE_SIZE, TILE_SIZE))
+
+# Monster images
+monster_names = ["zombie","skeleton","golem","goblin","slime","ghost","wizard","demon","dragon"]
+monster_imgs = {}
+for name in monster_names:
+    img = pygame.image.load(f"monsters/{name}.png").convert_alpha()
+    monster_imgs[name] = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+
+# Tiles
+floor_img = pygame.image.load("tiles/floor.png").convert_alpha()
+floor_img = pygame.transform.scale(floor_img,(TILE_SIZE,TILE_SIZE))
+wall_img = pygame.image.load("tiles/wall.png").convert_alpha()
+wall_img = pygame.transform.scale(wall_img,(TILE_SIZE,TILE_SIZE))
+chest_closed_img = pygame.image.load("tiles/chest_closed.png").convert_alpha()
+chest_closed_img = pygame.transform.scale(chest_closed_img,(TILE_SIZE,TILE_SIZE))
+chest_open_img = pygame.image.load("tiles/chest_open.png").convert_alpha()
+chest_open_img = pygame.transform.scale(chest_open_img,(TILE_SIZE,TILE_SIZE))
+
+# --- Item and coin classes ---
+class Item:
+    def __init__(self,name,type,power=0,value=0,upgrade_level=0):
+        self.name = name
+        self.type = type
+        self.power = power
+        self.value = value
+        self.upgrade_level = upgrade_level
+        self.max_upgrade = 5
+
+    def upgrade(self):
+        if self.upgrade_level<self.max_upgrade:
+            self.upgrade_level +=1
+            self.power += self.power*0.2
+            self.value += self.value*0.3
+
+class Coins:
+    def __init__(self):
+        self.bronze = 0
+        self.silver = 0
+        self.gold = 0
+
+    def add(self,amount,coin_type):
+        if coin_type=='bronze': self.bronze += amount
+        elif coin_type=='silver': self.silver += amount
+        elif coin_type=='gold': self.gold += amount
+
+    def spend(self,amount,coin_type):
+        if coin_type=='bronze' and self.bronze>=amount:
+            self.bronze-=amount
+            return True
+        elif coin_type=='silver' and self.silver>=amount:
+            self.silver-=amount
+            return True
+        elif coin_type=='gold' and self.gold>=amount:
+            self.gold-=amount
+            return True
+        return False
+
+# --- Dungeon ---
+class Dungeon:
+    def __init__(self,width,height):
+        self.width = width
+        self.height = height
+        self.tiles = [[1 for y in range(height)] for x in range(width)]
+        self.rooms=[]
+        self.chests=[]
+        self.exit_tile=None
+        self.generate_rooms()
+
+    def generate_rooms(self):
+        for _ in range(random.randint(5,10)):
+            w=random.randint(4,8)
+            h=random.randint(4,6)
+            x=random.randint(1,self.width-w-1)
+            y=random.randint(1,self.height-h-1)
+            room = pygame.Rect(x,y,w,h)
+            if self.rooms:
+                prev_center = self.rooms[-1].center
+                new_center = room.center
+                if random.choice([True,False]):
+                    self.create_h_tunnel(prev_center[0],new_center[0],prev_center[1])
+                    self.create_v_tunnel(prev_center[1],new_center[1],new_center[0])
+                else:
+                    self.create_v_tunnel(prev_center[1],new_center[1],prev_center[0])
+                    self.create_h_tunnel(prev_center[0],new_center[0],new_center[1])
+            self.rooms.append(room)
+            self.carve_room(room)
+        # Chests
+        for room in self.rooms[1:]:
+            if random.random()<0.6:
+                cx=random.randint(room.left+1,room.right-2)
+                cy=random.randint(room.top+1,room.bottom-2)
+                self.chests.append({'x':cx,'y':cy,'open':False,'item':Item('Sword','weapon',10,50)})
+        # Exit tile at last room
+        last_room=self.rooms[-1]
+        self.exit_tile=(last_room.centerx,last_room.centery)
+
+    def carve_room(self,room):
+        for x in range(room.left,room.right):
+            for y in range(room.top,room.bottom):
+                self.tiles[x][y]=0
+
+    def create_h_tunnel(self,x1,x2,y):
+        for x in range(min(x1,x2),max(x1,x2)+1):
+            self.tiles[x][y]=0
+
+    def create_v_tunnel(self,y1,y2,x):
+        for y in range(min(y1,y2),max(y1,y2)+1):
+            self.tiles[x][y]=0
+
+    def draw(self,surface,camera_x,camera_y):
+        for x in range(self.width):
+            for y in range(self.height):
+                rect_x=x*TILE_SIZE-camera_x
+                rect_y=y*TILE_SIZE-camera_y
+                if self.tiles[x][y]==0:
+                    surface.blit(floor_img,(rect_x,rect_y))
+                else:
+                    surface.blit(wall_img,(rect_x,rect_y))
+        for chest in self.chests:
+            img = chest_open_img if chest['open'] else chest_closed_img
+            surface.blit(img,(chest['x']*TILE_SIZE-camera_x,chest['y']*TILE_SIZE-camera_y))
+        # Exit tile
+        ex,ey=self.exit_tile
+        pygame.draw.rect(surface,(255,215,0),(ex*TILE_SIZE-camera_x,ey*TILE_SIZE-camera_y,TILE_SIZE,TILE_SIZE))
+
+# --- Player ---
+class Player:
+    def __init__(self,x,y):
+        self.x=x
+        self.y=y
+        self.hp=100
+        self.speed=5
+        self.inventory=[]
+        self.coins=Coins()
+
+    def move(self,dx,dy,dungeon):
+        nx,ny=self.x+dx,self.y+dy
+        tx,ty=nx//TILE_SIZE,ny//TILE_SIZE
+        if dungeon.tiles[tx][ty]==0:
+            self.x,self.y=nx,ny
+
+    def draw(self,surface,camera_x,camera_y):
+        surface.blit(player_img,(self.x-camera_x,self.y-camera_y))
+
+# --- Monster ---
+class Monster:
+    def __init__(self,x,y,type):
+        self.x=x
+        self.y=y
+        self.type=type
+        self.hp=20
+        self.speed=2
+
+    def move_towards(self,player,dungeon):
+        dx=dy=0
+        if player.x>self.x: dx=self.speed
+        if player.x<self.x: dx=-self.speed
+        if player.y>self.y: dy=self.speed
+        if player.y<self.y: dy=-self.speed
+        tx,ty=(self.x+dx)//TILE_SIZE,(self.y+dy)//TILE_SIZE
+        if dungeon.tiles[tx][ty]==0:
+            self.x+=dx
+            self.y+=dy
+
+    def draw(self,surface,camera_x,camera_y):
+        img=monster_imgs[self.type]
+        surface.blit(img,(self.x-camera_x,self.y-camera_y))
+
+# --- Initialize dungeon and entities ---
+dungeon=Dungeon(50,50)
+player=Player(dungeon.rooms[0].centerx*TILE_SIZE,dungeon.rooms[0].centery*TILE_SIZE)
+monsters=[]
+for room in dungeon.rooms[1:]:
+    m_type=random.choice(monster_names)
+    mx=random.randint(room.left+1,room.right-2)*TILE_SIZE
+    my=random.randint(room.top+1,room.bottom-2)*TILE_SIZE
+    monsters.append(Monster(mx,my,m_type))
+
+# --- Main loop ---
+running=True
+while running:
+    clock.tick(FPS)
+    for event in pygame.event.get():
+        if event.type==pygame.QUIT:
+            running=False
+
+    keys=pygame.key.get_pressed()
+    dx=dy=0
+    if keys[pygame.K_a]: dx=-player.speed
+    if keys[pygame.K_d]: dx=player.speed
+    if keys[pygame.K_w]: dy=-player.speed
+    if keys[pygame.K_s]: dy=player.speed
+    player.move(dx,dy,dungeon)
+
+    # Attack monsters
+    if keys[pygame.K_SPACE]:
+        for monster in monsters[:]:
+            if abs(player.x-monster.x)<TILE_SIZE and abs(player.y-monster.y)<TILE_SIZE:
+                monster.hp-=10
+                if monster.hp<=0:
+                    monsters.remove(monster)
+                    player.coins.add(random.randint(1,5),'bronze')
+
+    # Open chests
+    if keys[pygame.K_e]:
+        for chest in dungeon.chests:
+            if not chest['open'] and abs(player.x//TILE_SIZE - chest['x'])<=1 and abs(player.y//TILE_SIZE - chest['y'])<=1:
+                chest['open']=True
+                player.inventory.append(chest['item'])
+
+    for monster in monsters:
+        monster.move_towards(player,dungeon)
+
+    camera_x=player.x-SCREEN_WIDTH//2
+    camera_y=player.y-SCREEN_HEIGHT//2
+
+    screen.fill((0,0,0))
+    dungeon.draw(screen,camera_x,camera_y)
+    player.draw(screen,camera_x,camera_y)
+    for monster in monsters:
+        monster.draw(screen,camera_x,camera_y)
+
+    # UI: Coins
+    font=pygame.font.SysFont(None,24)
+    text=font.render(f"Bronze:{player.coins.bronze} Silver:{player.coins.silver} Gold:{player.coins.gold}",True,(255,255,255))
+    screen.blit(text,(10,10))
+
+    pygame.display.flip()
+
+pygame.quit()

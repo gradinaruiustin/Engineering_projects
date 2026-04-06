@@ -1,0 +1,183 @@
+function robot_interface 
+    ip = "IP_Board_ESP32";
+    port = 80;
+    esp = connectESP(ip, port);
+
+    fig = uifigure('Name', 'Humanoid Robot Control', 'Position', [100 100 900 600]);
+
+    % Room Map
+    mapPanel = uipanel(fig, 'Title', 'Room Map', 'Position', [10 200 600 380]);
+    axMap = uiaxes(mapPanel, 'Position', [10 10 580 340]);
+    view(axMap, 3); grid(axMap, 'on');
+    xlabel(axMap, 'X [cm]'); ylabel(axMap, 'Y [cm]'); zlabel(axMap, 'Distance [cm]');
+    xlim(axMap, [-250 250]); ylim(axMap, [-250 250]); zlim(axMap, [0 400]);
+    hold(axMap, 'on');
+
+    % Robot Stats
+    dataPanel = uipanel(fig, 'Title', 'Robot Stats', 'Position', [620 200 270 380]);
+    txtStatus = uitextarea(dataPanel, 'Position', [10 280 250 90], 'Editable', 'off', 'FontName', 'Consolas');
+
+    axVolt = uiaxes(dataPanel, 'Position', [10 190 250 70]);
+    title(axVolt, 'Tensiune [V]');
+    axVolt.XTickLabelRotation = 45;
+    grid(axVolt, 'on');
+
+    axCurr = uiaxes(dataPanel, 'Position', [10 100 250 70]);
+    title(axCurr, 'Curent [mA]');
+    axCurr.XTickLabelRotation = 45;
+    grid(axCurr, 'on');
+
+    % Comenzi
+    pathPanel = uipanel(fig, 'Title', 'Path Editor', 'Position', [10 10 880 180]);
+    btnScan = uibutton(pathPanel, 'Text', 'Scan Room', ...
+        'Position', [10 120 120 30], 'ButtonPushedFcn', @(src,event) scanRoom(axMap, esp, ip, port));
+    btnStatus = uibutton(pathPanel, 'Text', 'Get Status', ...
+        'Position', [140 120 120 30], 'ButtonPushedFcn', @(src,event) getStatus(esp, txtStatus, axVolt, axCurr, ip, port));
+    btnPath = uibutton(pathPanel, 'Text', 'Set New Path', ...
+        'Position', [270 120 120 30], 'ButtonPushedFcn', @(src,event) setNewPath(axMap, esp, ip, port));
+
+    % Inițializare Excel (șterge dacă există)
+    if exist("robot_data_log.xlsx", 'file')
+        delete("robot_data_log.xlsx");
+    end
+end
+
+function esp = connectESP(ip, port)
+    for i = 1:3
+        try
+            esp = tcpclient(ip, port, 'Timeout', 5);
+            fprintf('Conexiune stabilită cu ESP32 la %s:%d\n', ip, port);
+            return;
+        catch
+            pause(1);
+        end
+    end
+    error("Nu s-a putut conecta la ESP32.");
+end
+
+function [line, esp] = safeReadline(esp, ip, port, timeoutSeconds)
+    tic; line = "";
+    while toc < timeoutSeconds
+        try
+            if isempty(esp) || ~isvalid(esp)
+                esp = connectESP(ip, port);
+            end
+            if esp.NumBytesAvailable > 0
+                line = readline(esp);
+                return;
+            end
+        catch
+            esp = connectESP(ip, port);
+        end
+        pause(0.1);
+    end
+    error("Timeout la citirea datelor de la ESP32.");
+end
+
+function scanRoom(ax, esp, ip, port)
+    cla(ax);
+    angles = []; distances = [];
+    fig = ancestor(ax, 'figure');
+    try
+        if isempty(esp) || ~isvalid(esp)
+            esp = connectESP(ip, port);
+        end
+        writeline(esp, "SCAN");
+    catch ME
+        uialert(fig, ME.message, 'Eroare');
+        return;
+    end
+
+    for i = 1:7  % pentru unghiuri 60,70,...,120
+        try
+            [line, esp] = safeReadline(esp, ip, port, 10);
+            parts = split(string(line), ',');
+            if numel(parts) == 2
+                a = str2double(parts(1));
+                d = str2double(parts(2));
+                if ~isnan(a) && ~isnan(d)
+                    % Conversie unghi + distanță în coordonate 2D (X,Y)
+                    [x, y] = pol2cart(deg2rad(a - 90), d); % -90 pt centrare față
+                    plot3(ax, x, y, d, 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b');
+                    hold(ax, 'on');
+                    angles(end+1) = a;
+                    distances(end+1) = d;
+                end
+            end
+        catch ME
+            uialert(fig, ME.message, 'Eroare');
+            return;
+        end
+    end
+
+    % Linie care conectează punctele scanate
+    if ~isempty(angles)
+        [X, Y] = pol2cart(deg2rad(angles - 90), distances);
+        plot3(ax, X, Y, distances, 'r-', 'LineWidth', 2);
+    end
+end
+
+function getStatus(esp, txtStatus, axVolt, axCurr, ip, port)
+    fig = ancestor(txtStatus, 'figure');
+    try
+        if isempty(esp) || ~isvalid(esp)
+            esp = connectESP(ip, port);
+        end
+        writeline(esp, "STATUS");
+        statusStr = "";
+        for i=1:2
+            line = readline(esp);
+            statusStr = statusStr + line + newline;
+        end
+        txtStatus.Value = statusStr;
+
+        % Extrage tensiune și curent din text
+        volt = extractBetween(statusStr, "Voltage: ", " V");
+        curr = extractBetween(statusStr, "Current: ", " mA");
+
+        voltNum = str2double(volt);
+        currNum = str2double(curr);
+
+        % Actualizează graficele
+        cla(axVolt); bar(axVolt, voltNum, 0.5, 'FaceColor', 'g');
+        ylim(axVolt, [0 20]); % Setează limite după specificații reale
+        cla(axCurr); bar(axCurr, currNum, 0.5, 'FaceColor', 'r');
+        ylim(axCurr, [0 500]);
+    catch ME
+        uialert(fig, ME.message, 'Eroare');
+    end
+end
+
+function setNewPath(ax, esp, ip, port)
+    fig = ancestor(ax, 'figure');
+    % Simplu - click-uri pentru traseu
+    uiwait(msgbox('Click pe hartă pentru a defini traseul (apasă ESC când termini).'));
+    [x, y] = getpts(ax);
+
+    if isempty(x)
+        return;
+    end
+
+    % Trimite traseul punct cu punct
+    try
+        if isempty(esp) || ~isvalid(esp)
+            esp = connectESP(ip, port);
+        end
+
+        for i = 1:length(x)
+            % Conversie coordonate (X,Y) în unghi și distanță pentru servo dacă e nevoie
+            angle = rad2deg(atan2(y(i), x(i))) + 90;
+            if angle < 0, angle = angle + 360; end
+            dist = sqrt(x(i)^2 + y(i)^2);
+
+            % Trimite comanda MOVE pentru servo cap (exemplu)
+            cmd = sprintf("MOVE 0 %d", round(angle));
+            writeline(esp, cmd);
+            pause(0.5); % Așteaptă servo să ajungă
+        end
+
+        plot(ax, x, y, 'm-', 'LineWidth', 2);
+    catch ME
+        uialert(fig, ME.message, 'Eroare la trimiterea traseului');
+    end
+end

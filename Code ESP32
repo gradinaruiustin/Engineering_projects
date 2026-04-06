@@ -1,0 +1,49 @@
+// Acest cod pentru ESP32 va gestiona comunicarea Bluetooth între Raspberry Pi și Arduino (prin HC
+05), primind comenzile de la Raspberry Pi și trimițându-le mai departe la Arduino. 
+#include <BluetoothSerial.h> 
+BluetoothSerial SerialBT;  // Obiect pentru comunicarea Bluetooth 
+void setup() { 
+Serial.begin(115200);         // Serial pentru monitorizare 
+SerialBT.begin("ESP32 ");   // Numele dispozitivului Bluetooth 
+Serial.println("Bluetooth is ready to pair."); 
+} 
+void loop() { 
+if (SerialBT.available()) {   // Dacă există date disponibile prin Bluetooth 
+String command = SerialBT.readStringUntil('\n');  // Citire comandă de la Raspberry Pi 
+Serial.println("Received command: " + command);  // Afișează comanda primită pe serial monitor 
+// Trimite comanda către Arduino prin HC-05 
+if (command == "autonom") { 
+Serial.write("autonom\n");  // Trimite comanda completă pentru mod autonom 
+} 
+else if (command == "manual") { 
+Serial.write("manual\n");  // Trimite comanda completă pentru mod manual 
+} 
+else if (command == "mergi înainte") { 
+Serial.write("mergi înainte\n");  // Mișcare înainte 
+} 
+else if (command == "mergi înapoi") { 
+Serial.write("mergi înapoi\n");  // Mișcare înapoi 
+} 
+else if (command == "întoarce-te") { 
+Serial.write("întoarce-te\n");  // Întoarcere 
+} 
+else if (command == "ridică mâna dreaptă") { 
+Serial.write("ridică mâna dreaptă\n");  // Ridicare mâna dreaptă 
+} 
+else if (command == "coboară mâna dreaptă") { 
+Serial.write("coboară mâna dreaptă\n");  // Coborâre mâna dreaptă 
+} 
+else if (command == "ridică mâna stângă") { 
+} 
+Serial.write("ridică mâna stângă\n");  // Ridicare mâna stângă 
+else if (command == "coboară mâna stângă") { 
+Serial.write("coboară mâna stângă\n");  // Coborâre mâna stângă 
+} 
+else if (command == "analizează zona") { 
+Serial.write("analizează zona\n");  // Analizează zona 
+} 
+else { 
+Serial.println("Unknown command."); 
+} 
+} 
+}

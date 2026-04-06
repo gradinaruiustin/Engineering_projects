@@ -1,0 +1,60 @@
+# Adjustable Linear Power Supply Using LM317
+
+## 1. Objective
+The goal of this project is to design, simulate, and analyze a linear adjustable voltage power supply using the **LM317** positive voltage regulator. The supply is fed from a **230V AC, 50Hz mains**, with full-wave bridge rectification.
+
+## 2. General Circuit Description
+The power supply consists of the following functional stages:
+
+1. **Step-down transformer** – reduces mains voltage from 230V AC to 2×12V AC  
+2. **Bridge rectifier** – converts AC voltage to DC  
+3. **Filtering** – uses a large electrolytic capacitor to reduce ripple  
+4. **Voltage adjustment** – implemented using LM317 with a resistive divider (R1 and R2/potentiometer)  
+5. **Stabilization** – additional capacitors reduce switching noise and instabilities  
+
+## 3. Components Used
+
+| No | Component | Specifications | Function |
+|----|-----------|----------------|---------|
+| 1  | Transformer | 230V/2×12V, 200 mA, 2.4 W | Step-down mains voltage |
+| 2  | Rectifier Diodes | 1N4007, 1000V, 1A, slow recovery | Full-bridge rectification |
+| 3  | C1 | 470μF / 6V | Primary DC filtering |
+| 4  | C2 | 0.22μF / 50V | High-frequency noise suppression |
+| 5  | LM317 | Adjustable linear regulator (1.2 – 37V) | Voltage stabilization and adjustment |
+| 6  | R1 | 100Ω | Fixed part of voltage divider |
+| 7  | R2 | Potentiometer 5kΩ | Variable part of voltage divider |
+| 8  | C3 | 10μF / 25V | Output stabilization |
+
+## 4. Operating Principle
+- The mains voltage (230V AC) is stepped down to 2×12V AC  
+- After rectification and filtering, an unsmoothed DC voltage is obtained  
+- LM317 maintains a stable, adjustable output voltage according to:
+
+\[
+V_{OUT} = V_{REF} \left(1 + \frac{R2}{R1}\right) + I_{ADJ} \cdot R2
+\]
+
+Where:  
+- \(V_{REF} \approx 1.25V\)  
+- \(I_{ADJ}\) is very small (~50μA) and often negligible
+
+## 5. Output Voltage Calculation
+For:  
+- R1 = 240 Ω  
+- R2 = 0 ÷ 4800 Ω (via potentiometer)  
+
+The output voltage range is:  
+\[
+V_{OUT} = 1.25\,V \text{ (min) } \text{ to } 26.2\,V \text{ (max) }
+\]
+
+## 6. Simulation
+Simulation can be performed using LTSpice, Proteus, or any other circuit simulator to verify voltage regulation and ripple.
+
+## 7. Conclusions
+The designed power supply offers:  
+- Adjustable voltage from **1.25V to ~26V**  
+- Stable output with low ripple and noise  
+- Low cost and high reliability for general applications  
+
+The modifications made to the reference schematic are technically sound, ensuring optimal operation both in simulation and practical implementation.

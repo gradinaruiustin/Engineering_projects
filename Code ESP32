@@ -1,0 +1,138 @@
+#include <WiFi.h>
+#include <Wire.h>
+#include <Adafruit_INA219.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <NewPing.h>
+#include <MPU6050.h>
+
+// Wi-Fi credentials
+const char* ssid = "Name_WIFI";
+const char* password = "Password_WIFI";
+WiFiServer server(80);
+
+// HC-SR04 ultrasonic sensor pins and max distance
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+NewPing sonar(TRIG_PIN, ECHO_PIN, 400);
+
+// PCA9685 servo driver
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+#define SERVO_MIN 102
+#define SERVO_MAX 512
+
+// INA219 current/voltage sensor
+Adafruit_INA219 ina219;
+
+// MPU6050 IMU sensor
+MPU6050 mpu;
+
+// Servo config
+#define NUM_SERVOS 10
+
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize I2C
+  Wire.begin(21, 22); // SDA, SCL pins
+
+  // Initialize sensors and devices
+  ina219.begin();
+  mpu.initialize();
+  pwm.begin();
+  pwm.setPWMFreq(50); // Set PWM frequency for servos
+
+  // Move all servos to 90 degrees initial position
+  for (int i = 0; i < NUM_SERVOS; i++) {
+    moveServo(i, 90);
+  }
+
+  // Connect to WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  // Start server
+  server.begin();
+}
+
+void loop() {
+  if (!client || !client.connected()) {
+    client = server.available(); // Accept new client if none connected
+  }
+  
+  if (client && client.connected() && client.available()) {
+    String cmd = client.readStringUntil('\n');
+    cmd.trim();
+
+    if (cmd == "STATUS") {
+      sendStatus(client);
+    } 
+    else if (cmd == "ORIENTATION") {
+      sendOrientation(client);
+    } 
+    else if (cmd == "SCAN") {
+      scanRoom(client);
+    } 
+    else if (cmd.startsWith("MOVE")) {
+      handleMove(cmd);
+    }
+  }
+}
+
+void moveServo(int ch, int angle) {
+  int pulse = map(angle, 0, 180, SERVO_MIN, SERVO_MAX);
+  pwm.setPWM(ch, 0, pulse);
+}
+
+void handleMove(String cmd) {
+  // Example: MOVE 0 120 (servo 0, angle 120)
+  int firstSpace = cmd.indexOf(' ');
+  int secondSpace = cmd.indexOf(' ', firstSpace + 1);
+  if (firstSpace == -1 || secondSpace == -1) return;
+
+  int ch = cmd.substring(firstSpace + 1, secondSpace).toInt();
+  int angle = cmd.substring(secondSpace + 1).toInt();
+  if (ch >= 0 && ch < NUM_SERVOS && angle >= 0 && angle <= 180) {
+    moveServo(ch, angle);
+  }
+}
+
+void scanRoom(WiFiClient &client) {
+  const int startAngle = 60;
+  const int endAngle = 120;
+  const int step = 10;
+
+  for (int angle = startAngle; angle <= endAngle; angle += step) {
+    moveServo(0, angle);           // Capul se mișcă între 60° și 120°
+    delay(500);                   // Așteaptă servo-ul să ajungă
+
+    long dist = sonar.ping_cm();
+    if (dist == 0) dist = 400;    // Distanță maximă dacă nu este detectat obstacol
+
+    client.printf("%d,%ld\n", angle, dist);
+  }
+
+  // Revenire la poziția centrală după scanare
+  moveServo(0, (startAngle + endAngle) / 2);
+}
+
+void sendStatus(WiFiClient &client) {
+  float volt = ina219.getBusVoltage_V();
+  float curr = ina219.getCurrent_mA();
+  client.printf("Voltage: %.2f V\n", volt);
+  client.printf("Current: %.2f mA\n", curr);
+}
+
+void sendOrientation(WiFiClient &client) {
+  int16_t ax, ay, az, gx, gy, gz;
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  client.printf("Orientation: %d,%d,%d,%d,%d,%d\n", ax, ay, az, gx, gy, gz);
+}

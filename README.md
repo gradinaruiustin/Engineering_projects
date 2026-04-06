@@ -13,10 +13,9 @@ The goal of this project is to build an intelligent humanoid robot capable of:
 **ESP32 (WiFi + Bluetooth)**  
 - Processor: ESP32-WROOM-32D, dual-core Tensilica LX6, up to 240 MHz  
 - Memory: 520 KB SRAM, 448 KB ROM, 4 MB Flash  
-- Connectivity: WiFi 802.11 b/g/n/e/i, Bluetooth 4.2 BLE  
+- Connectivity: WiFi, Bluetooth 
 - Pins: 34 GPIO including analog inputs, SPI, I2C, UART  
-- Power: 5V via MicroUSB, logic 3.3V  
-- Security: AES, SHA-2, ECC, RSA, WPA/WPA2/WPA3  
+- Power: 5V via MicroUSB, logic 3.3V   
 
 ### Motors & Motor Control
 **MG996R Servo Motor** (trunk, legs)  
